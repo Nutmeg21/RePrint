@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,247 +7,318 @@ import {
   ScrollView, 
   ActivityIndicator,
   Modal,
-  Alert
+  Alert,
+  Image,
+  Dimensions,
+  FlatList,
+  ImageBackground,
+  SafeAreaView
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import QRCode from 'react-native-qrcode-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // --- Constants ---
+const { width, height } = Dimensions.get('window');
 const COLORS = {
   primary: '#10B981',     
-  secondary: '#059669',   
-  background: '#111827',  
-  card: '#1F2937',        
-  text: '#F9FAFB',        
-  textSecondary: '#9CA3AF', 
-  danger: '#EF4444',
-  success: '#34D399'
+  secondary: '#064E3B',   
+  background: '#0F172A',  
+  surface: '#1E293B',     
+  text: '#F8FAFC',        
+  textMuted: '#94A3B8',
+  accent: '#38BDF8'       
 };
 
-// --- Helper Logic ---
-const MATERIAL_DENSITY = {
-  PET: 1.38, // g/cm3 (Standard Water Bottles)
-  PLA: 1.24,
-};
+// --- LOCAL DATA ---
+// Make sure these files exist in your 'assets' folder!
+const PREMADE_DESIGNS = [
+  { id: 1, name: 'Whistle', bottles: 1, image: require('./assets/whistle.png'), weight: 12 },
+  { id: 2, name: 'Phone Stand', bottles: 3, image: require('./assets/phone_stand.png'), weight: 34 },
+  { id: 3, name: 'Bag Clip', bottles: 1, image: require('./assets/clip.png'), weight: 8 },
+  { id: 4, name: 'Comb', bottles: 2, image: require('./assets/comb.png'), weight: 22 },
+  { id: 5, name: 'Carabiner', bottles: 2, image: require('./assets/carabiner.png'), weight: 18 },
+  { id: 6, name: 'Planter', bottles: 5, image: require('./assets/planter.png'), weight: 55 },
+];
 
-const calculateMaterial = (volumeCm3) => {
-  // We default to PET because this is a bottle recycling machine
-  const weightGrams = volumeCm3 * MATERIAL_DENSITY.PET;
-  const gramsPerBottle = 12; 
-  const bottlesNeeded = Math.ceil(weightGrams / gramsPerBottle);
-  
-  return { weightGrams, bottlesNeeded };
-};
-
-// --- Components ---
-
-const Header = ({ title }) => (
-  <View style={styles.headerContainer}>
-    <Text style={styles.headerTitle}>{title}</Text>
-    <View style={styles.avatar}>
-      <Ionicons name="person" size={18} color={COLORS.primary} />
-    </View>
-  </View>
-);
-
-const MachineStatusModal = ({ visible, onClose, step }) => {
-  // This simulates the "Talk" with the machine
+// --- Helper Components ---
+const MachineStatusModal = ({ visible, step }) => {
   const steps = {
-    1: { text: "Scanning QR Code...", icon: "qrcode-scan" },
-    2: { text: "Connecting to Machine...", icon: "wifi" },
-    3: { text: "Verifying Weight...", icon: "scale-balance" },
-    4: { text: "Material Accepted!", icon: "check-circle", color: COLORS.success },
+    1: { text: "Connecting...", icon: "wifi" },
+    2: { text: "Verifying Material...", icon: "scale-balance" },
+    3: { text: "Accepted!", icon: "check-circle", color: '#4ADE80' },
   };
-
   const current = steps[step] || steps[1];
 
   return (
-    <Modal transparent={true} visible={visible} animationType="fade">
+    <Modal transparent visible={visible} animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <MaterialCommunityIcons name={current.icon} size={50} color={current.color || COLORS.primary} />
+          <MaterialCommunityIcons name={current.icon} size={48} color={current.color || COLORS.primary} />
           <Text style={styles.modalText}>{current.text}</Text>
-          <ActivityIndicator size="small" color={COLORS.primary} style={{marginTop: 20}} />
+          {step < 3 && <ActivityIndicator size="small" color={COLORS.primary} style={{marginTop: 15}} />}
         </View>
       </View>
     </Modal>
   );
 };
 
-// --- Screen 1: Dashboard ---
+// --- Screen 1: Dashboard (Redesigned Hero) ---
 const DashboardScreen = ({ navigation }) => {
   return (
-    <ScrollView style={styles.container}>
-      <Header title="Re:Print" />
+    <View style={styles.containerNoPadding}>
       
-      {/* Credits Card */}
-      <View style={styles.creditCard}>
-        <View>
-          <Text style={styles.creditLabel}>Eco Credits</Text>
-          <Text style={styles.creditValue}>1,250</Text>
-        </View>
-        <MaterialCommunityIcons name="recycle" size={40} color="rgba(255,255,255,0.2)" />
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-           <Text style={styles.statNumber}>42</Text>
-           <Text style={styles.statLabel}>Bottles</Text>
-        </View>
-        <View style={styles.statBox}>
-           <Text style={styles.statNumber}>3.5kg</Text>
-           <Text style={styles.statLabel}>CO2 Saved</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Actions</Text>
+      {/* 1. TOP HERO SECTION (Full Width Banner) */}
       <TouchableOpacity 
-        style={styles.actionButton}
+        style={styles.topHeroContainer} 
+        activeOpacity={0.9}
         onPress={() => navigation.navigate('Print')}
       >
-        <View style={styles.iconCircle}>
-          <MaterialCommunityIcons name="cube-send" size={24} color={COLORS.primary} />
-        </View>
-        <View style={{flex: 1}}>
-          <Text style={styles.actionTitle}>New Print Job</Text>
-          <Text style={styles.actionSub}>Upload STL & Calculate</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={24} color={COLORS.textSecondary} />
+        <ImageBackground
+          // Using a Remote URL since you don't have this one locally
+          source={{uri: 'https://images.unsplash.com/photo-1615655406736-b37c4d898e6f?q=80&w=800&auto=format&fit=crop'}}
+          style={styles.heroImage}
+        >
+          <LinearGradient colors={['rgba(15, 23, 42, 0.3)', 'rgba(15, 23, 42, 0.9)']} style={styles.heroGradient}>
+            <SafeAreaView style={styles.safeArea}>
+              
+              {/* Header inside the Banner */}
+              <View style={styles.heroHeaderRow}>
+                <View>
+                  <Text style={styles.heroGreeting}>Welcome Back,</Text>
+                  <Text style={styles.heroSubtitle}>Ready to recycle today?</Text>
+                </View>
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={24} color={COLORS.textMuted} />
+                </View>
+              </View>
+
+              {/* Big CTA Text */}
+              <View style={styles.heroCTA}>
+                <View style={styles.ctaIconCircle}>
+                   <MaterialCommunityIcons name="cube-send" size={32} color={COLORS.primary} />
+                </View>
+                <Text style={styles.ctaTitle}>Start New Project</Text>
+                <Text style={styles.ctaSub}>Tap here to choose a design or upload</Text>
+              </View>
+
+            </SafeAreaView>
+          </LinearGradient>
+        </ImageBackground>
       </TouchableOpacity>
-    </ScrollView>
+
+      {/* 2. BOTTOM CONTENT SECTION (Sheet Style) */}
+      <View style={styles.bottomSheet}>
+        <Text style={styles.sectionHeader}>Your Impact</Text>
+        
+        {/* Credits Card */}
+        <LinearGradient 
+          colors={['#059669', '#10B981']} 
+          start={{x:0, y:0}} end={{x:1, y:1}} 
+          style={styles.creditCard}
+        >
+          <View>
+            <Text style={styles.creditLabel}>Eco Credits</Text>
+            <Text style={styles.creditValue}>1,250</Text>
+          </View>
+          <MaterialCommunityIcons name="leaf" size={40} color="rgba(255,255,255,0.2)" />
+        </LinearGradient>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+             <MaterialCommunityIcons name="bottle-soda-classic-outline" size={28} color={COLORS.accent} />
+             <Text style={styles.statNumber}>42</Text>
+             <Text style={styles.statLabel}>Bottles</Text>
+          </View>
+          <View style={styles.statBox}>
+             <MaterialCommunityIcons name="molecule-co2" size={28} color="#F472B6" />
+             <Text style={styles.statNumber}>3.5kg</Text>
+             <Text style={styles.statLabel}>Saved</Text>
+          </View>
+          <View style={styles.statBox}>
+             <MaterialCommunityIcons name="printer-3d-nozzle-outline" size={28} color="#FBBF24" />
+             <Text style={styles.statNumber}>8</Text>
+             <Text style={styles.statLabel}>Prints</Text>
+          </View>
+        </View>
+      </View>
+
+    </View>
   );
 };
 
-// --- Screen 2: Print & Link Logic ---
-const PrintScreen = () => {
-  const [step, setStep] = useState('upload'); // upload, analyzing, result, qr
-  const [file, setFile] = useState(null);
-  const [data, setData] = useState(null);
-  
-  // Simulation State
-  const [machineStep, setMachineStep] = useState(0);
-  const [showModal, setShowModal] = useState(false);
+// --- Screen 2: Print Hub ---
+const PrintScreen = ({ navigation }) => {
+  const [view, setView] = useState('hub'); 
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [machineStep, setMachineStep] = useState(1);
 
-  const handleUpload = () => {
-    setStep('analyzing');
+  const selectPremade = (item) => {
+    setSelectedItem(item);
+    setView('result'); 
+  };
+
+  const selectCustom = () => {
+    setView('analyzing');
     setTimeout(() => {
-      // Mock Calculation
-      const vol = 85.5;
-      const calc = calculateMaterial(vol);
-      setData({ volume: vol, ...calc });
-      setFile({ name: 'Voronoi_Vase.stl' });
-      setStep('result');
-    }, 1500);
+      setSelectedItem({
+        name: 'Custom_Gear_v4.stl',
+        bottles: 4,
+        weight: 48,
+        image: null 
+      });
+      setView('result');
+    }, 2000);
   };
 
-  const generateJob = () => {
-    setStep('qr');
-  };
-
-  const simulateMachineSync = () => {
-    // This function mimics the machine verifying the bottles
-    setShowModal(true);
+  const simulateMachine = () => {
+    setModalVisible(true);
     setMachineStep(1);
-
-    // Sequence of fake events
-    setTimeout(() => setMachineStep(2), 1500); // Connected
-    setTimeout(() => setMachineStep(3), 3000); // Weighing
-    setTimeout(() => setMachineStep(4), 5000); // Accepted
+    setTimeout(() => setMachineStep(2), 2000);
+    setTimeout(() => setMachineStep(3), 4000);
     setTimeout(() => {
-      setShowModal(false);
-      setMachineStep(0);
-      Alert.alert("Success", "The machine has started printing your object!");
-      setStep('upload'); // Reset
-    }, 6500);
+      setModalVisible(false);
+      Alert.alert("Success", "Printing Started!");
+      setView('hub');
+    }, 5500);
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      <MachineStatusModal visible={showModal} step={machineStep} />
-      <Header title="Print Wizard" />
-
-      {step === 'upload' && (
-        <TouchableOpacity style={styles.uploadZone} onPress={handleUpload}>
-          <MaterialCommunityIcons name="cloud-upload-outline" size={60} color={COLORS.primary} />
-          <Text style={styles.zoneTitle}>Upload 3D Model</Text>
-          <Text style={styles.zoneSub}>Supports .STL, .OBJ</Text>
-        </TouchableOpacity>
-      )}
-
-      {step === 'analyzing' && (
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Slicing Model...</Text>
-          <Text style={styles.loadingSub}>Analyzing geometry density</Text>
+  if (view === 'hub') {
+    return (
+      <View style={styles.containerPadded}>
+        <View style={styles.headerContainer}>
+           <Text style={styles.headerTitle}>Design Library</Text>
+           <Text style={styles.headerSubtitle}>Select a model or upload your own</Text>
         </View>
-      )}
+        
+        <TouchableOpacity style={styles.uploadCard} onPress={selectCustom}>
+           <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.uploadGradient}>
+             <MaterialCommunityIcons name="cloud-upload" size={32} color="#fff" />
+             <View style={{marginLeft: 15, flex: 1}}>
+               <Text style={styles.uploadTitle}>Upload Custom File</Text>
+               <Text style={styles.uploadSub}>Supports .STL and .OBJ</Text>
+             </View>
+             <Ionicons name="chevron-forward" size={24} color="#fff" />
+           </LinearGradient>
+        </TouchableOpacity>
 
-      {step === 'result' && data && (
-        <View>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Material Breakdown</Text>
+        <Text style={styles.sectionHeader}>Community Designs</Text>
+        
+        <FlatList 
+          data={PREMADE_DESIGNS}
+          numColumns={2}
+          keyExtractor={item => item.id.toString()}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          renderItem={({item}) => (
+            <TouchableOpacity 
+              style={styles.gridItem} 
+              onPress={() => selectPremade(item)}
+              activeOpacity={0.8}
+            >
+              {/* UPDATED: Uses local image source */}
+              <Image source={item.image} style={styles.gridImage} />
+              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={styles.gridOverlay}>
+                <Text style={styles.gridTitle}>{item.name}</Text>
+                <View style={styles.gridBadge}>
+                  <MaterialCommunityIcons name="bottle-soda" size={12} color={COLORS.primary} />
+                  <Text style={styles.gridBadgeText}>{item.bottles} Bottles</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  }
+
+  if (view === 'analyzing') {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingTitle}>Slicing Model...</Text>
+        <Text style={styles.loadingSub}>Calculating density & infill</Text>
+      </View>
+    );
+  }
+
+  const isQR = view === 'qr';
+  
+  return (
+    <ScrollView style={styles.containerPadded}>
+      <MachineStatusModal visible={modalVisible} step={machineStep} />
+      
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => setView('hub')} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{isQR ? "Scan at Kiosk" : "Job Summary"}</Text>
+        <View style={{width: 40}} />
+      </View>
+
+      {!isQR ? (
+        <View style={{marginTop: 20}}>
+          <View style={styles.summaryCard}>
+            {selectedItem.image ? (
+              // UPDATED: Uses local image source
+              <Image source={selectedItem.image} style={styles.summaryImage} />
+            ) : (
+              <View style={styles.summaryPlaceholder}>
+                <MaterialCommunityIcons name="printer-3d" size={60} color={COLORS.primary} />
+              </View>
+            )}
             
-            {/* Auto-Selected Material */}
-            <View style={styles.row}>
-              <Text style={styles.label}>Material Type</Text>
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>rPET (Recycled)</Text>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryTitle}>{selectedItem.name}</Text>
+              
+              <View style={styles.detailRow}>
+                 <Text style={styles.detailLabel}>Estimated Weight</Text>
+                 <Text style={styles.detailValue}>{selectedItem.weight}g</Text>
+              </View>
+              <View style={styles.detailRow}>
+                 <Text style={styles.detailLabel}>Material</Text>
+                 <Text style={styles.detailValue}>rPET (Recycled)</Text>
+              </View>
+              
+              <View style={styles.divider} />
+              
+              <View style={styles.costBox}>
+                <Text style={styles.costLabel}>REQUIRED DEPOSIT</Text>
+                <View style={styles.costRow}>
+                   <MaterialCommunityIcons name="bottle-soda-classic" size={32} color={COLORS.primary} />
+                   <Text style={styles.costValue}>{selectedItem.bottles} Bottles</Text>
+                </View>
               </View>
             </View>
-
-            <View style={styles.row}>
-              <Text style={styles.label}>Volume</Text>
-              <Text style={styles.value}>{data.volume} cm³</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.row}>
-              <Text style={styles.label}>Required Weight</Text>
-              <Text style={styles.value}>{data.weightGrams.toFixed(1)}g</Text>
-            </View>
-
-            {/* The Big Number */}
-            <View style={styles.highlightBox}>
-              <Text style={styles.highlightLabel}>YOU NEED TO DEPOSIT</Text>
-              <Text style={styles.highlightValue}>{data.bottlesNeeded} BOTTLES</Text>
-              <Text style={styles.highlightSub}>Standard 500ml PET Bottles</Text>
-            </View>
           </View>
 
-          <TouchableOpacity style={styles.mainButton} onPress={generateJob}>
-            <Text style={styles.btnText}>Generate Machine Code</Text>
+          <TouchableOpacity style={styles.mainButton} onPress={() => setView('qr')}>
+            <Text style={styles.mainBtnText}>Confirm & Generate Code</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : (
+        <View style={styles.qrContainer}>
+           <View style={styles.qrCard}>
+             <QRCode value={JSON.stringify(selectedItem)} size={220} />
+             <Text style={styles.qrHint}>Align code with machine scanner</Text>
+           </View>
 
-      {step === 'qr' && (
-        <View style={styles.centerBox}>
-          <Text style={styles.qrTitle}>Scan at Kiosk</Text>
-          <Text style={styles.qrSub}>Show this code to the vending machine camera</Text>
-          
-          <View style={styles.qrContainer}>
-            <QRCode 
-              value={`{"job":"${file.name}", "bottles":${data.bottlesNeeded}}`} 
-              size={200}
-              backgroundColor="white"
-            />
-          </View>
+           <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                Machine will open intake for <Text style={{fontWeight: 'bold', color: COLORS.primary}}>{selectedItem.bottles} bottles</Text>. 
+                Please remove caps before depositing.
+              </Text>
+           </View>
 
-          <View style={styles.infoBox}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.infoText}>
-              Machine will unlock intake door for {data.bottlesNeeded} bottles after scanning.
-            </Text>
-          </View>
-
-          {/* DEMO BUTTON: Hidden in a "Developer Mode" style or just explicit for demo */}
-          <TouchableOpacity style={styles.demoButton} onPress={simulateMachineSync}>
-            <Text style={styles.demoText}>[DEMO] Simulate Machine Scan</Text>
-          </TouchableOpacity>
+           <TouchableOpacity style={styles.demoButton} onPress={simulateMachine}>
+             <Text style={styles.demoText}>[DEMO] Simulate Connection</Text>
+           </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -267,9 +338,13 @@ export default function App() {
           tabBarStyle: styles.tabBar,
           tabBarShowLabel: false,
           tabBarIcon: ({ focused }) => {
-            let iconName = 'home';
-            if (route.name === 'Print') iconName = 'cube';
-            return <MaterialCommunityIcons name={iconName} size={28} color={focused ? COLORS.primary : COLORS.textSecondary} />;
+            let iconName;
+            if (route.name === 'Home') {
+              iconName = focused ? 'home-variant' : 'home-variant-outline';
+            } else if (route.name === 'Print') {
+              iconName = 'printer-3d'; 
+            }
+            return <MaterialCommunityIcons name={iconName} size={28} color={focused ? COLORS.primary : COLORS.textMuted} />;
           },
         })}
       >
@@ -282,64 +357,106 @@ export default function App() {
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background, paddingTop: 50, paddingHorizontal: 20 },
-  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.text },
-  avatar: { width: 35, height: 35, borderRadius: 20, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
+  // LAYOUT CONTAINERS
+  containerNoPadding: { flex: 1, backgroundColor: COLORS.background },
+  containerPadded: { flex: 1, backgroundColor: COLORS.background, paddingHorizontal: 30, paddingTop: 60 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+
+  // HERO SECTION (New)
+  topHeroContainer: { height: height * 0.45, width: '100%' }, // Takes top 45% of screen
+  heroImage: { width: '100%', height: '100%' },
+  heroGradient: { flex: 1, paddingHorizontal: 30, justifyContent: 'center' },
+  safeArea: { flex: 1, justifyContent: 'space-between', paddingBottom: 60, paddingTop: 50 },
   
-  // Dashboard Styles
-  creditCard: { backgroundColor: COLORS.primary, borderRadius: 16, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  creditLabel: { color: '#E6FFFA', fontSize: 14, fontWeight: '600' },
-  creditValue: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
-  statBox: { backgroundColor: COLORS.card, width: '48%', padding: 15, borderRadius: 12, alignItems: 'center' },
-  statNumber: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  statLabel: { color: COLORS.textSecondary, fontSize: 12 },
-  sectionTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  actionButton: { backgroundColor: COLORS.card, flexDirection: 'row', padding: 15, borderRadius: 12, alignItems: 'center' },
-  iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(16, 185, 129, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  actionTitle: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
-  actionSub: { color: COLORS.textSecondary, fontSize: 12 },
-
-  // Upload/Print Styles
-  uploadZone: { height: 300, borderWidth: 2, borderColor: COLORS.card, borderStyle: 'dashed', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
-  zoneTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginTop: 15 },
-  zoneSub: { color: COLORS.textSecondary, marginTop: 5 },
+  heroHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  heroGreeting: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
+  heroSubtitle: { fontSize: 16, color: '#CBD5E1', marginTop: 5 },
   
-  centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  loadingText: { color: COLORS.text, marginTop: 20, fontSize: 18, fontWeight: 'bold' },
-  loadingSub: { color: COLORS.textSecondary, marginTop: 5 },
+  avatarPlaceholder: { 
+    width: 44, height: 44, borderRadius: 22, 
+    backgroundColor: 'rgba(255,255,255,0.1)', 
+    justifyContent: 'center', alignItems: 'center', 
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'
+  },
 
-  card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 20, marginTop: 10 },
-  cardTitle: { color: COLORS.textSecondary, fontSize: 14, textTransform: 'uppercase', marginBottom: 15 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  label: { color: COLORS.text, fontSize: 16 },
-  value: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
-  pill: { backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  pillText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: COLORS.background, marginVertical: 10 },
-  
-  highlightBox: { backgroundColor: COLORS.background, padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: COLORS.primary },
-  highlightLabel: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
-  highlightValue: { color: COLORS.text, fontSize: 28, fontWeight: 'bold', marginVertical: 5 },
-  highlightSub: { color: COLORS.textSecondary, fontSize: 12 },
+  heroCTA: { marginBottom: 20 },
+  ctaIconCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(16, 185, 129, 0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 1, borderColor: COLORS.primary },
+  ctaTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  ctaSub: { fontSize: 14, color: COLORS.primary, marginTop: 5, fontWeight: '600' },
 
-  mainButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  // BOTTOM SHEET SECTION (New)
+  bottomSheet: { 
+    flex: 1, 
+    backgroundColor: COLORS.background, 
+    marginTop: -40, // Pulls up over the image
+    borderTopLeftRadius: 30, 
+    borderTopRightRadius: 30, 
+    paddingHorizontal: 30, 
+    paddingTop: 30,
+    elevation: 20
+  },
 
-  // QR Styles
-  qrTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold', marginBottom: 5 },
-  qrSub: { color: COLORS.textSecondary, marginBottom: 30, textAlign: 'center' },
-  qrContainer: { padding: 15, backgroundColor: '#fff', borderRadius: 16 },
-  infoBox: { flexDirection: 'row', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: 15, borderRadius: 12, marginTop: 30, alignItems: 'center' },
-  infoText: { color: COLORS.primary, marginLeft: 10, flex: 1 },
-  demoButton: { marginTop: 40, padding: 15, borderWidth: 1, borderColor: COLORS.textSecondary, borderRadius: 8, width: '100%', alignItems: 'center' },
-  demoText: { color: COLORS.textSecondary, fontFamily: 'monospace' },
+  // STATS
+  sectionHeader: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, marginBottom: 15 },
+  creditCard: { borderRadius: 20, padding: 20, marginBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  creditLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  creditValue: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 5 },
 
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: COLORS.card, width: '80%', padding: 30, borderRadius: 20, alignItems: 'center' },
-  modalText: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginTop: 20, textAlign: 'center' },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  statBox: { backgroundColor: COLORS.surface, width: '31%', padding: 15, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  statNumber: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginVertical: 5 },
+  statLabel: { color: COLORS.textMuted, fontSize: 11 },
 
-  tabBar: { backgroundColor: COLORS.card, borderTopColor: 'transparent', height: 60 },
+  // PRINT HUB STYLES
+  headerContainer: { marginBottom: 25 },
+  headerTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.text },
+  headerSubtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 5 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  uploadCard: { marginBottom: 30, borderRadius: 16, overflow: 'hidden', elevation: 5 },
+  uploadGradient: { flexDirection: 'row', alignItems: 'center', padding: 20 },
+  uploadTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
+  uploadSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+
+  gridItem: { width: (width - 75) / 2, height: 180, borderRadius: 16, overflow: 'hidden', marginBottom: 15, backgroundColor: COLORS.surface }, 
+  gridImage: { width: '100%', height: '100%' },
+  gridOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingTop: 40 },
+  gridTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  gridBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  gridBadgeText: { color: COLORS.primary, fontSize: 12, marginLeft: 4, fontWeight: 'bold' },
+
+  summaryCard: { backgroundColor: COLORS.surface, borderRadius: 24, overflow: 'hidden', marginBottom: 20 },
+  summaryImage: { width: '100%', height: 200 },
+  summaryPlaceholder: { width: '100%', height: 200, backgroundColor: '#334155', justifyContent: 'center', alignItems: 'center' },
+  summaryContent: { padding: 20 },
+  summaryTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text, marginBottom: 20 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  detailLabel: { color: COLORS.textMuted, fontSize: 15 },
+  detailValue: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+  divider: { height: 1, backgroundColor: '#334155', marginVertical: 15 },
+  costBox: { backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: 15, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
+  costLabel: { color: COLORS.primary, fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 5 },
+  costRow: { flexDirection: 'row', alignItems: 'center' },
+  costValue: { color: COLORS.text, fontSize: 22, fontWeight: 'bold', marginLeft: 10 },
+
+  mainButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 14, alignItems: 'center' },
+  mainBtnText: { color: '#064E3B', fontSize: 16, fontWeight: 'bold' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+
+  qrContainer: { alignItems: 'center', marginTop: 20 },
+  qrCard: { padding: 25, backgroundColor: '#fff', borderRadius: 24, alignItems: 'center', marginBottom: 30 },
+  qrHint: { color: '#64748B', marginTop: 15, fontSize: 13 },
+  infoBox: { padding: 15, backgroundColor: 'rgba(56, 189, 248, 0.1)', borderRadius: 12, marginBottom: 30 },
+  infoText: { color: COLORS.accent, textAlign: 'center', lineHeight: 20 },
+  demoButton: { padding: 15 },
+  demoText: { color: COLORS.textMuted, fontFamily: 'monospace', fontSize: 12 },
+
+  loadingTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginTop: 20 },
+  loadingSub: { color: COLORS.textMuted, marginTop: 5 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '75%', backgroundColor: COLORS.surface, padding: 30, borderRadius: 24, alignItems: 'center' },
+  modalText: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginTop: 15 },
+
+  tabBar: { backgroundColor: COLORS.background, borderTopColor: '#334155', height: 60, paddingBottom: 5 }
 });
