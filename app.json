@@ -20,10 +20,16 @@
         "foregroundImage": "./assets/RePrint_logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nutmegdot.RePrint"
     },
     "web": {
       "favicon": "./assets/RePrint_logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "26b0cf95-e6a1-4c75-9b01-c976a41dc927"
+      }
     }
   }
 }
